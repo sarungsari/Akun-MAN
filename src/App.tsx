@@ -231,18 +231,6 @@ export default function App() {
   const [canInstallPwa, setCanInstallPwa] = useState<boolean>(false);
   const [pwaInstallSuccess, setPwaInstallSuccess] = useState<string | null>(null);
 
-  const fetchDriveSpreadsheets = async (token: string) => {
-    setIsLoadingDriveSheets(true);
-    try {
-      const files = await listGoogleSpreadsheets(token);
-      setDriveSpreadsheets(files);
-    } catch (err) {
-      console.warn('Gagal memuat spreadsheet dari Google Drive:', err);
-    } finally {
-      setIsLoadingDriveSheets(false);
-    }
-  };
-
   const loadAllData = async () => {
     try {
       const [allPersons, allServices, allAccess, dbSettings] = await Promise.all([
@@ -2050,7 +2038,6 @@ export default function App() {
                 </div>
               </div>
             )}
-            </div>
           </div>
         )}
 

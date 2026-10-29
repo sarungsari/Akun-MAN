@@ -33,6 +33,7 @@ PWA untuk mengelola akun Google yang digunakan bersama, tautan layanan AI, statu
   - Durasi tetap dalam jam (misal 2 jam, 3 jam, 5 jam).
   - Penyesuaian waktu reset manual (*edit resetAt*).
 - **Sesi Pemakaian Terstruktur**: Aksi Buka Sesi (meluncurkan URL), Stop (mencatat durasi; status tetap Ready), dan Limit (mengubah status menjadi Limited).
+- **Filter Cepat Status 'READY'**: Tombol toggle filter instan di tab Dashboard untuk hanya menampilkan akun yang siap digunakan, mempercepat pergantian giliran kerja tim.
 - **Rekomendasi Pergantian Cepat (Fast Switch)**: Saran akun siap pakai berikutnya pada tiap kartu layanan dalam maksimal 2 ketukan.
 - **Catatan & Audit Trail**:
   - Catatan bebas per akun Google.
@@ -221,7 +222,7 @@ Aplikasi menerapkan standar Progressive Web App (PWA) lengkap yang dapat dipasan
 
 ## Pengujian
 
-Test suite lengkap mencakup 16 file pengujian dengan 68 skenario:
+Test suite lengkap mencakup 16 file pengujian dengan 70 skenario (100% lulus):
 
 ```bash
 npm test
@@ -238,7 +239,7 @@ Cakupan pengujian:
 - Ekspor/impor JSON lokal & integritas relasional (`tests/backup-json.test.ts`).
 - Probe Apps Script, normalisasi URL, & deteksi HTML error (`tests/sheet-probe.test.ts`).
 - Backup/restore Google Sheets & Fail-Closed snapshot (`tests/backup-sheet.test.ts`).
-- Service Worker & PWA offline lifecycle (`tests/pwa-offline.test.ts`).
+- Service Worker, PWA offline lifecycle & aset WebAPK Android (`tests/pwa-offline.test.ts`).
 
 ---
 
@@ -247,36 +248,40 @@ Cakupan pengujian:
 ```text
 .
 ├── apps-script/
-│   └── Code.gs                  # Skrip Google Apps Script v2.1 untuk Google Sheets
+│   └── Code.gs                       # Skrip Google Apps Script v2.1 untuk Google Sheets
 ├── public/
-│   ├── icon-192.svg             # Ikon PWA 192x192
-│   ├── icon-512.svg             # Ikon PWA 512x512
-│   ├── manifest.webmanifest     # Manifest Web PWA
-│   └── sw.js                    # Service Worker offline caching
+│   ├── icon-192.png                  # Ikon PNG Android WebAPK 192x192
+│   ├── icon-512.png                  # Ikon PNG Android Splash Screen 512x512
+│   ├── icon-maskable-512.png         # Ikon Adaptif Android Maskable 512x512
+│   ├── apple-touch-icon.png          # Ikon Webkit 180x180
+│   ├── icon-192.svg / icon-512.svg   # Ikon Vektor SVG
+│   ├── manifest.webmanifest          # Manifest Web PWA Standalone
+│   └── sw.js                         # Service Worker offline caching & fallback
 ├── src/
-│   ├── accounts/                # Logika CRUD Person & Access
-│   ├── backup/                  # JSON backup, Sheet backup, Apps Script code
-│   ├── components/              # Komponen modal konfirmasi & recovery
-│   ├── domain/                  # Logika aturan reset, status, builder URL
-│   ├── handoff/                 # Catatan lanjutan bersama per layanan
-│   ├── history/                 # Audit trail & riwayat log terpadu
-│   ├── pwa/                     # PWA registration helper
-│   ├── services/                # Logika CRUD Service AI
-│   ├── session/                 # Siklus buka sesi, stop, hit limit
-│   ├── storage/                 # IndexedDB wrapper (idb) & type definition
-│   ├── ui/                      # Helper dashboard & fast switch suggestion
-│   ├── App.tsx                  # Komponen utama UI aplikasi
-│   ├── main.tsx                 # Titik masuk React
-│   └── index.css                # Konfigurasi Tailwind CSS 4
-├── tests/                       # 16 berkas test Vitest
-├── BLUEPRINT.md                 # Spesifikasi teknis & aturan bisnis
-├── AI_WORKFLOW.md               # Konvensi workflow & guardrail
-├── SESSION_STATE.md             # Status sesi pengerjaan & task
-├── TASKS.md                     # Daftar task 12 backlog ZLCE
-├── CHANGELOG.md                 # Riwayat pembaruan versi
-├── package.json                 # Dependency & scripts
-├── tsconfig.json                # Konfigurasi TypeScript
-└── vite.config.ts               # Konfigurasi Vite & PWA manifest plugin
+│   ├── accounts/                     # Logika CRUD Person & Access
+│   ├── backup/                       # JSON backup, Sheet backup, Apps Script code
+│   ├── components/                   # Modal konfirmasi, guide PWA & recovery
+│   ├── domain/                       # Logika aturan reset, status, builder URL
+│   ├── handoff/                      # Catatan lanjutan bersama per layanan
+│   ├── history/                      # Audit trail & riwayat log terpadu
+│   ├── pwa/                          # PWA registration helper
+│   ├── services/                     # Logika CRUD Service AI
+│   ├── session/                      # Siklus buka sesi, stop, hit limit
+│   ├── storage/                      # IndexedDB wrapper (idb) & type definition
+│   ├── ui/                           # Helper dashboard, filter READY, switch suggestion
+│   ├── App.tsx                       # Komponen utama UI aplikasi
+│   ├── main.tsx                      # Titik masuk React
+│   └── index.css                     # Konfigurasi Tailwind CSS 4
+├── tests/                            # 16 berkas test Vitest (70 tes lulus)
+├── TUTORIAL_INSTALL_PWA_ANDROID.md   # Panduan lengkap instalasi PWA Android WebAPK
+├── BLUEPRINT.md                      # Spesifikasi teknis & aturan bisnis
+├── AI_WORKFLOW.md                    # Konvensi workflow & guardrail
+├── SESSION_STATE.md                  # Status sesi pengerjaan & task
+├── TASKS.md                          # Daftar task backlog ZLCE & revisi
+├── CHANGELOG.md                      # Riwayat pembaruan versi
+├── package.json                      # Dependency & scripts
+├── tsconfig.json                     # Konfigurasi TypeScript
+└── vite.config.ts                    # Konfigurasi Vite & PWA manifest plugin
 ```
 
 ---

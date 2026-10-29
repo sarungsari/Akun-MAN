@@ -274,4 +274,55 @@ MODE LITE: `Docs Impact` hanya merujuk `BLUEPRINT` / `TASKS`; `Test Case` meruju
 * **Test Case:** `backup-json.test::rejects_version_mismatch`, `backup-json.test::import_ignores_payload_maxPersons_policy`, `backup-json.test::rejects_orphan_access_and_services`, `backup-json.test::rejects_orphan_logs_and_invalid_at_type`, `backup-json.test::rejects_duplicate_entities_and_pairs`, `backup-sheet.test::corrupt_relational_sheet_rejected`
 * **Metode Verifikasi:** Vitest test runner + `tsc --noEmit` + `npm run build`; tempel output.
 
+---
+
+### TASK-REV-04: Sinkronisasi Google Sheets Mandiri & 1-Click Table Generator
+* **Fase:** FASE REVISI (Hardening v1.1)
+* **Deskripsi:** Mengimplementasikan fitur pembuatan dan pemformatan tabel spreadsheet otomatis (1-Click Table Generator) melalui Google Apps Script Web App tanpa memerlukan backend server atau Firebase. Memformat 6 tab sheet (`metadata`, `services`, `persons`, `access`, `logs`, `handoff`), menerapkan header bergaya gelap dengan proteksi format teks `@`, dan membersihkan sheet bawaan kosong.
+* **Dependensi:** `TASK-REV-03`
+* **File:** `apps-script/Code.gs`, `src/backup/sheet-probe.ts`, `src/backup/apps-script-code.ts`, `src/App.tsx`, `tests/sheet-probe.test.ts`
+* **Docs Terkait (Tier 1):** `BLUEPRINT.md` (BR-12, bagian 4), `CHANGELOG.md`
+* **Docs Impact:** `BLUEPRINT.md`, `README.md`, `CHANGELOG.md`
+* **Acceptance Criteria:**
+  1. Aksi `generate_default_tables` di `Code.gs` v2.1 membuat 6 tab sheet dengan header lengkap dan pemformatan teks murni (`@`) untuk mencegah formula injection.
+  2. Tab default kosong `Sheet1` otomatis dihapus setelah 6 tab utama dibuat.
+  3. UI antarmuka tab Backup menyertakan tombol aksi "Generate Tabel Bawaan Google Sheets" dengan indikator status dan pesan panduan.
+  4. Seluruh tes di `tests/sheet-probe.test.ts` (8/8) lulus.
+* **Test Case:** `sheet-probe.test::action_generate_tables`, `sheet-probe.test::probe_connection_success`
+* **Metode Verifikasi:** Vitest test runner + `tsc --noEmit`; tempel output.
+
+---
+
+### TASK-REV-05: Filter Cepat Status 'READY' pada Dashboard
+* **Fase:** FASE REVISI (Hardening v1.1)
+* **Deskripsi:** Menambahkan tombol toggle filter cepat di tab Dashboard untuk hanya menampilkan akun yang memiliki status 'READY', memudahkan tim saat pergantian sesi kerja tanpa perlu menyaring manual.
+* **Dependensi:** `TASK-007`
+* **File:** `src/App.tsx`
+* **Docs Terkait (Tier 1):** `BLUEPRINT.md` (BR-03, BR-11)
+* **Docs Impact:** `README.md`, `CHANGELOG.md`
+* **Acceptance Criteria:**
+  1. Terdapat tombol toggle/filter "Semua Akun" vs "Hanya READY" di tab Dashboard.
+  2. Saat filter aktif, kartu layanan hanya merender akun-akun dengan status `ready`.
+  3. Badge jumlah akun menyesuaikan secara dinamis dan tidak mengganggu alur "Akun Ready Berikutnya".
+* **Test Case:** `dashboard.test::fast_filter_ready_accounts`
+* **Metode Verifikasi:** Visual test pada tab Dashboard + `tsc --noEmit`; tempel bukti.
+
+---
+
+### TASK-REV-06: Kesiapan PWA Android WebAPK, Ikon PNG & Tautan Live HTTPS
+* **Fase:** FASE REVISI (Hardening v1.1)
+* **Deskripsi:** Menyediakan seluruh aset gambar PNG fisik (192px, 512px, maskable 512px) untuk memenuhi spesifikasi Google Android WebAPK, menyematkan tautan HTTPS resmi di seluruh dokumentasi dan modal in-app, menyediakan QR Code scanner untuk kemudahan buka di HP, serta memberikan panduan khusus agar pengguna tidak terjebak di browser internal chat (WhatsApp/Telegram).
+* **Dependensi:** `TASK-REV-02`, `TASK-012`
+* **File:** `public/manifest.webmanifest`, `public/icon-192.png`, `public/icon-512.png`, `public/icon-maskable-512.png`, `public/apple-touch-icon.png`, `src/components/PwaInstallGuideModal.tsx`, `TUTORIAL_INSTALL_PWA_ANDROID.md`, `public/TUTORIAL_INSTALL_PWA_ANDROID.md`, `tests/pwa-offline.test.ts`
+* **Docs Terkait (Tier 1):** `BLUEPRINT.md` (bagian 1, 5), `README.md`, `TUTORIAL_INSTALL_PWA_ANDROID.md`
+* **Docs Impact:** `BLUEPRINT.md`, `README.md`, `CHANGELOG.md`
+* **Acceptance Criteria:**
+  1. Berkas PNG fisik `public/icon-192.png`, `public/icon-512.png`, `public/icon-maskable-512.png`, dan `apple-touch-icon.png` tersedia dengan ukuran valid.
+  2. `public/manifest.webmanifest` merujuk seluruh ikon PNG standar WebAPK Android serta mode `standalone`.
+  3. Dokumen `TUTORIAL_INSTALL_PWA_ANDROID.md` memuat URL HTTPS live produksi, langkah kirim link ke ponsel, dan peringatan in-app browser (harus pilih "Buka di Chrome").
+  4. Modal `PwaInstallGuideModal.tsx` menampilkan kartu tautan HTTPS dengan tombol salin 1-ketuk dan toggle pemindai Kode QR.
+  5. Seluruh tes di `tests/pwa-offline.test.ts` (10/10) lulus (total 70/70 di 16 files).
+* **Test Case:** `pwa-offline.test::android_pwa_tutorial_and_assets`, `pwa-offline.test::manifest_and_sw_integrity`
+* **Metode Verifikasi:** Vitest test runner + `tsc --noEmit` + `npm run build`; tempel bukti.
+
 

@@ -12,8 +12,8 @@ Perubahan v1.0 (TASK-012): Konfigurasi hosting statis GitHub Pages terverifikasi
 * **Profil Domain:** none
 * **Lingkungan Produksi:**
   - Runtime: browser Android (Chrome/Edge/Brave) sebagai PWA terpasang
-  - Hosting statis: GitHub Pages (HTTPS; Q-08) dengan base path `./`, caching offline `sw.js`, dan isolasi IndexedDB
-  - PWA Installability: `manifest.webmanifest` standalone dengan dukungan ikon 192px & 512px serta in-app install prompt
+  - Hosting statis: Cloud Run / GitHub Pages (HTTPS; Q-08) dengan base path `./`, caching offline `sw.js`, dan isolasi IndexedDB
+  - PWA Installability: `manifest.webmanifest` standalone dengan dukungan ikon PNG fisik (192px, 512px, maskable 512px, apple-touch-icon 180px), prompt instalasi UI, pemindai QR kamera HP, dan URL HTTPS live
   - Database: IndexedDB (lokal, per perangkat, offline-first)
   - Framework: React 19 + Vite 8
 * **Versi Dependensi Terverifikasi:**
@@ -93,6 +93,7 @@ Perubahan v1.0 (TASK-012): Konfigurasi hosting statis GitHub Pages terverifikasi
     2. Proteksi Sheet Kosong: Pemulihan dari Sheet yang memiliki 0 entitas ke database lokal yang berisi entitas ditolak untuk mencegah penghapusan data akibat spreadsheet yang salah atau belum diinisialisasi.
     3. Konfirmasi Overwrite Terinformasi: Pengguna disajikan rincian perbandingan kuantitas entitas (remote vs lokal) sebelum konfirmasi penimpaan.
     4. Skema Kolom Tetap (`SCHEMAS`) & Format Teks Murni (`@`): Mencegah hilangnya kolom opsional (`limitedAt`, `resetAt`, `durationSec`) dan memitigasi formula injection (`=IMPORTDATA`, dll).
+    5. Generator Tabel Bawaan Google Sheets (TASK-REV-04): Aksi `generate_default_tables` di `Code.gs` v2.1 mengotomatisasi pembuatan 6 tab (`metadata`, `services`, `persons`, `access`, `logs`, `handoff`) dengan format header gelap, menghapus tab kosong bawaan `Sheet1`, tanpa memerlukan Firebase.
 * Layanan AI (AI Studio, Claude, OpenAI, DeepSeek, X): hanya tautan keluar, tanpa API.
 
 ---

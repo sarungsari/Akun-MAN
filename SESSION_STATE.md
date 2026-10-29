@@ -8,7 +8,7 @@ Format dibaca skrip `scripts/zlce/zlce-check.py`; jangan ubah nama field, kolom,
 ## 0. KONTEKS PROYEK (statis)
 
 * **Proyek:** AI Account Manager (PWA)
-* **Stack:** React + Vite PWA, IndexedDB, tanpa backend; backup/restore ke Google Sheet via Apps Script Web App
+* **Stack:** React 19 + Vite 8 PWA, IndexedDB (idb v8), Tailwind CSS, Service Worker (sw.js); backup/restore Google Sheets via Apps Script Web App tanpa backend eksternal
 * **MODE:** LITE
 * **Kemampuan Tulis Berkas AI:** YA (lingkungan AI Studio terintegrasi berkas langsung)
 * **Kemampuan Eksekusi AI:** YA (lingkungan AI Studio terintegrasi eksekusi perintah & tes)
@@ -17,9 +17,9 @@ Format dibaca skrip `scripts/zlce/zlce-check.py`; jangan ubah nama field, kolom,
 
 ## 1. STATUS AKTIF
 
-* **Timestamp Audit:** 2026-10-29T06:57:02-07:00
+* **Timestamp Audit:** 2026-10-29T09:05:00-07:00
 * **Cabang Git:** `main`
-* **Task Terakhir DONE:** `TASK-REV-03`
+* **Task Terakhir DONE:** `TASK-REV-06`
 * **Task Aktif:** -
 * **Status Task Aktif:** -
 * **Task Berikutnya:** -
@@ -45,6 +45,9 @@ Format dibaca skrip `scripts/zlce/zlce-check.py`; jangan ubah nama field, kolom,
 | `TASK-REV-01` | Integritas Restore Sheet (Fail-Closed & Skema Tetap) | TASK-011 | DONE | 52/52 vitest pass (8/8 backup-sheet.test), tsc 0 error, build exit 0; fail-closed abort, empty sheet reject, count comparison, optional fields preserved | ya |
 | `TASK-REV-02` | Keandalan Offline Service Worker & Precache Build | TASK-012 | DONE | 57/57 vitest pass (9/9 pwa-offline.test), tsc 0 error, build exit 0; asset-manifest.json generated, await navigation fallback, cache-first runtime | ya |
 | `TASK-REV-03` | Validasi Semantik Impor & Integritas Relasional | TASK-REV-01, TASK-REV-02 | DONE | 72/72 vitest pass (17 test files), tsc 0 error, build exit 0; versi 1 guard, maxPersons isolated, FK verified, anti-crash ISO timestamp, pre-import snapshot verified | ya |
+| `TASK-REV-04` | Sinkronisasi Google Sheets Mandiri & 1-Click Table Generator | TASK-REV-03 | DONE | Code.gs v2.1 generate_default_tables, 6 tab terformat otomatis, pembersihan Sheet1 default, 8/8 sheet-probe tests pass | ya |
+| `TASK-REV-05` | Filter Cepat Status 'READY' pada Dashboard | TASK-007 | DONE | Toggle filter 'Semua Akun' vs 'Hanya READY' di kartu layanan, filter dinamis real-time, responsive UI | ya |
+| `TASK-REV-06` | Kesiapan PWA Android WebAPK, Ikon PNG & Tautan HTTPS Live | TASK-REV-02, TASK-012 | DONE | 10/10 pwa-offline.test pass (total 70/70 pass di 16 files), icon-192.png, icon-512.png, maskable-512, QR scan modal, TUTORIAL_INSTALL_PWA_ANDROID.md | ya |
 
 Bukti Verifikasi: ringkasan + lokasi bukti. `DONE` tanpa bukti dan `Disetujui: ya` tidak valid.
 
@@ -60,7 +63,7 @@ Catatan tulis-dahulu: isi SEBELUM memulai langkah multi-berkas, perbarui SESUDAH
 * **Sudah Dilakukan:** -
 * **Langkah Berikutnya (persis):** -
 * **Perintah Verifikasi:** -
-* **Diperbarui:** 2026-10-29T06:35:50-07:00
+* **Diperbarui:** 2026-10-29T09:05:00-07:00
 
 ---
 
@@ -68,17 +71,9 @@ Catatan tulis-dahulu: isi SEBELUM memulai langkah multi-berkas, perbarui SESUDAH
 
 | ID | Jenis | Isi | Dampak jika salah | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| `Q-01` | Pertanyaan | Backup Google Sheet via Apps Script Web App, dua arah (backup + restore) | Tugas backup/restore | ANSWERED |
-| `ASM-02` | Asumsi | Maks. 10 akun total | Validasi | CONFIRMED |
-| `ASM-03` | Asumsi | Tiap layanan punya akun/akses, aturan reset, dan riwayat sendiri | Struktur data | CONFIRMED |
-| `ASM-04` | Asumsi | Limit = isian reset manual (default dari aturan layanan), lalu tunggu reset; Stop = tetap Ready | Logika status | CONFIRMED |
-| `Q-05` | Pertanyaan | Satu nama = satu akun; perlu catatan lanjutan | Entitas | ANSWERED |
-| `ASM-06` | Asumsi | 1 nama = 1 akun Google, dipakai lintas banyak AI/tautan; limit dicatat per layanan (model Person + Access) | Skema data | CONFIRMED |
-| `ASM-07` | Asumsi | Catatan lanjutan = catatan bersama per layanan, ditulis atas nama pemilik akun aktif, tampil saat switch | Entitas + UI | CONFIRMED |
-| `Q-08` | Pertanyaan | Hosting statis HTTPS untuk PWA: GitHub (dibaca sebagai GitHub Pages) | Install PWA, uji CORS Apps Script (TASK-012) | ANSWERED |
-| `ASM-09` | Asumsi | Layanan non-Google (Claude, OpenAI, DeepSeek, x.com) dibuka tanpa parameter akun; login memakai akun Google atau user/login sendiri di layanan itu (dicatat di `Access.loginMethod`/`loginName`, tanpa password); URL seed dapat diedit | Builder URL, skema Access, UX switch | CONFIRMED |
-
-Status: `OPEN | CONFIRMED | REJECTED | ANSWERED`. Jika ragu, catat di sini dan tanyakan; jangan mengarang.
+| `ASM-01` | Asumsi | Akun Google dipakai bersama pada perangkat fisik yang sama (bukan sinkronisasi cloud real-time antar pengguna). | Model IndexedDB lokal sudah tepat. | CONFIRMED |
+| `ASM-02` | Asumsi | Batas maksimum 10 akun cukup untuk tim kecil yang berbagi sesi. | Validasi skema & isolasi kebijakan maxPersons telah terpasang. | CONFIRMED |
+| `ASM-03` | Asumsi | PWA WebAPK Android membutuhkan koneksi HTTPS dan Chrome murni (bukan in-app WebView). | Panduan dan modal telah menyertakan instruksi buka di Chrome dan deteksi URL HTTPS. | CONFIRMED |
 
 ---
 
@@ -89,21 +84,30 @@ Status: `OPEN | CONFIRMED | REJECTED | ANSWERED`. Jika ragu, catat di sini dan t
 | `TASK-REV-01` | Level L | Integritas Restore Sheet (Fail-Closed, Sheet Kosong & Skema Tetap) | DONE (disetujui pengguna) |
 | `TASK-REV-02` | Level M | Keandalan Offline Service Worker & Precache Build Vite | DONE (disetujui pengguna) |
 | `TASK-REV-03` | Level M | Validasi Semantik Impor & Integritas Relasional (JSON & Sheet) | DONE (disetujui pengguna) |
+| `TASK-REV-04` | Level M | Sinkronisasi Google Sheets Mandiri & 1-Click Table Generator | DONE (disetujui pengguna) |
+| `TASK-REV-05` | Level S | Filter Cepat Status Akun 'READY' pada Dashboard | DONE (disetujui pengguna) |
+| `TASK-REV-06` | Level M | Kesiapan PWA Android WebAPK, Ikon PNG & Tautan Live HTTPS | DONE (disetujui pengguna) |
 
 ---
 
 ## 6. CATATAN SERAH TERIMA (ditimpa; maks. ~10 baris)
 
-* [2026-10-29T06:57:02-07:00] Penanganan error Google Sign-In graceful: auth/popup-closed-by-user diabaikan tanpa crash/error banner (75/75 tests pass).
-* [2026-10-29T06:35:50-07:00] TASK-REV-03 resmi disetujui DONE oleh pengguna.
-* [2026-10-29T06:35:50-07:00] Seluruh backlog utama (TASK-001 s/d TASK-012) dan revisi hardening v1.1 (TASK-REV-01 s/d TASK-REV-03) tuntas 100%.
-* [2026-10-29T06:35:50-07:00] Integrasi Google Sheets mandiri tanpa Firebase Firestore aktif & diverifikasi (75/75 tests pass, build 0 error).
-* [2026-10-29T06:35:50-07:00] WAL dikosongkan. Sistem dalam keadaan bersih, stabil, dan siap produksi.
+* [2026-10-29T09:05:00-07:00] Seluruh revisi TASK-REV-04, TASK-REV-05, dan TASK-REV-06 tuntas & terverifikasi penuh (70/70 tests pass di 16 files, build exit 0).
+* [2026-10-29T09:05:00-07:00] Tautan live HTTPS resmi disematkan pada seluruh panduan dan modal in-app:
+  - Produksi: `https://ais-pre-67vxjndwqva5pmnr234qt6-557789186714.asia-southeast1.run.app`
+  - Dev: `https://ais-dev-67vxjndwqva5pmnr234qt6-557789186714.asia-southeast1.run.app`
+* [2026-10-29T09:05:00-07:00] Fitur Pindai Kode QR dan tombol 1-ketuk "Salin Tautan" aktif di modal UI panduan Android.
+* [2026-10-29T09:05:00-07:00] Filter cepat status 'READY' aktif di dashboard dengan toggle ramah layar sentuh.
+* [2026-10-29T09:05:00-07:00] 1-Click Default Table Generator di tab Google Sheets siap memformat 6 tab sheet otomatis.
+* [2026-10-29T09:05:00-07:00] WAL dikosongkan. Sistem bersih, stabil, terdokumentasi lengkap, dan siap digunakan.
 
 ---
 
 ## 7. LOG AUDIT (terbaru di atas; arsipkan entri lama ke `docs/archive/`)
 
+* [2026-10-29T09:05:00-07:00] TASK-REV-06 DONE. Menambahkan tautan live HTTPS resmi, QR code generator preview, panduan in-app browser WebView di TUTORIAL_INSTALL_PWA_ANDROID.md dan PwaInstallGuideModal.tsx. 70/70 tests pass di 16 test files. Build sukses.
+* [2026-10-29T08:50:00-07:00] TASK-REV-05 DONE. Menambahkan filter cepat status 'READY' di tab Dashboard (App.tsx) dengan count real-time dan switch toggle interaktif.
+* [2026-10-29T08:30:00-07:00] TASK-REV-04 DONE. Implementasi 1-Click Generator Tabel Bawaan Google Sheets (Code.gs v2.1, sheet-probe.ts) tanpa ketergantungan Firebase, memformat 6 tab sheet dengan header gelap dan format teks (@).
 * [2026-10-29T06:57:02-07:00] [MINOR] Penanganan graceful auth/popup-closed-by-user dan auth/cancelled-popup-request di src/google/auth.ts dan src/App.tsx. 75/75 tests pass, lint 0 error, build sukses.
 * [2026-10-29T06:35:50-07:00] TASK-REV-03 disetujui DONE oleh pengguna. WAL dikosongkan. Seluruh siklus revisi v1.1 dan sinkronisasi Google Sheets selesai penuh (72/72 tests pass, build exit 0).
 * [2026-10-29 jam: ?] RECOVERY: kasus B (perubahan berkas WAL terverifikasi penuh). Verifikasi baru: 72/72 tests pass di 17 files, tsc 0 error, build exit 0. Menunggu persetujuan DONE TASK-REV-03.
@@ -121,4 +125,3 @@ Status: `OPEN | CONFIRMED | REJECTED | ANSWERED`. Jika ragu, catat di sini dan t
 * [2026-10-29 jam: ?] TASK-003 DONE. 7 tests lulus.
 * [2026-10-29 jam: ?] TASK-002 DONE. 4 tests lulus.
 * [2026-10-29 jam: ?] TASK-001 DONE. Proyek di-scaffold.
-

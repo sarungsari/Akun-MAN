@@ -1,18 +1,23 @@
 # LAPORAN TEST & REVIEW ARSITEKTUR: AI ACCOUNT MANAGER (PWA)
 
 * **Tanggal Audit:** 2026-10-29
-* **Versi Sistem:** v1.0 (PWA)
+* **Versi Sistem:** v1.1 (PWA WebAPK, Google Sheets Sync v2.1)
 * **Metodologi Pengembangan:** ZLCE (Zero Loss Context Engineering - Mode LITE)
 * **Stack:** React 19, Vite 8, Tailwind CSS, IndexedDB (idb v8), Service Worker (sw.js), Google Apps Script Web App Endpoint.
-* **Status Backlog:** TASK-001 s/d TASK-012 (12/12 DONE - 100%)
+* **Status Backlog:** TASK-001 s/d TASK-012, TASK-REV-01 s/d TASK-REV-06 (18/18 DONE - 100%)
 
 ---
 
 ## 1. RINGKASAN EKSEKUTIF
 
-AI Account Manager (PWA) telah menyelesaikan seluruh siklus backlog teknis. Aplikasi dirancang khusus untuk skenario **perangkat tunggal yang digunakan bersama oleh banyak orang** guna mengelola akun AI (Google AI Studio, Claude, ChatGPT, DeepSeek, X), memantau sisa limit pemakaian, dan melakukan serah terima pekerjaan (*handoff*) tanpa menyimpan kata sandi atau token layanan (BR-01).
+AI Account Manager (PWA) telah menyelesaikan seluruh siklus backlog teknis beserta revisi hardening v1.1. Aplikasi dirancang khusus untuk skenario **perangkat tunggal yang digunakan bersama oleh banyak orang** guna mengelola akun AI (Google AI Studio, Claude, ChatGPT, Grok, Perplexity), memantau sisa limit pemakaian, dan melakukan serah terima pekerjaan (*handoff*) tanpa menyimpan kata sandi atau token layanan (BR-01).
 
-Pengujian otomatis mencakup **48 skenario unit/E2E pada 16 berkas tes**, pemeriksaan linting TypeScript tanpa kesalahan (0 error), dan kompilasi build produksi exit code 0.
+Pengujian otomatis mencakup **70 skenario unit/E2E pada 16 berkas tes (100% lulus)**, pemeriksaan linting TypeScript tanpa kesalahan (0 error), dan kompilasi build produksi exit code 0.
+
+Fitur tambahan terbaru mencakup:
+- **1-Click Default Table Generator**: Otomatis membuat dan memformat 6 tab Google Spreadsheet terstruktur tanpa Firebase.
+- **Filter Cepat Status 'READY'**: Filter instan di dashboard untuk mempercepat rotasi akun kerja tim.
+- **Dukungan PWA Android WebAPK Mandiri**: Aset PNG fisik (192px, 512px, maskable adaptif), tautan live HTTPS resmi, QR code scanner di antarmuka, serta panduan terverifikasi.
 
 ---
 
@@ -29,7 +34,7 @@ Pengujian otomatis mencakup **48 skenario unit/E2E pada 16 berkas tes**, pemerik
 | **BR-07** | Maksimal 10 akun (`Person`) total; akun ke-11 ditolak | `tests/person.test.ts::max_10` (`✓ pass`). Divalidasi di level database dan helper manager. | **PATUH** |
 | **BR-08** | CRUD Layanan; hapus dengan konfirmasi dan cascade delete (akses, log, note) | `tests/service.test.ts::delete_cascades` (`✓ pass`). Hapus layanan membersihkan seluruh data terkait. | **PATUH** |
 | **BR-09** | Catatan bebas per akun Google; riwayat audit trail terperinci per akses | `tests/history.test.ts::ordered_events` (`✓ pass`). Audit trail kronologis terpadu mencatat seluruh siklus hidup. | **PATUH** |
-| **BR-10** | Ekspor & Impor JSON lokal lengkap dengan validasi skema ketat | `tests/backup-json.test.ts` (`3/3 pass`). Roundtrip identik; file korup/palsu ditolak tanpa merusak database. | **PATUH** |
+| **BR-10** | Ekspor & Impor JSON lokal lengkap dengan validasi skema ketat | `tests/backup-json.test.ts` (`10/10 pass`). Roundtrip identik; file korup/palsu ditolak tanpa merusak database. | **PATUH** |
 | **BR-11** | Tindakan switch akun cepat <= 2 ketukan dari dashboard | `tests/dashboard.test.ts::next_ready_suggestion` & `tests/pwa-offline.test.ts::full_switch_flow` (`✓ pass`). | **PATUH** |
 | **BR-12** | Backup & Restore Google Sheets via Apps Script dua arah + auto-snapshot pre-restore | `tests/backup-sheet.test.ts::local_copy_before_restore` (`✓ pass`). Salinan lokal dibuat otomatis sebelum overwrite. | **PATUH** |
 | **BR-13** | Endpoint URL dan Secret Key hanya di lokal (tidak ikut diekspor) | `tests/backup-json.test.ts::excludes_secrets` & `tests/backup-sheet.test.ts` (`✓ pass`). Rahasia disaring dari payload. | **PATUH** |
@@ -42,9 +47,9 @@ Pengujian otomatis mencakup **48 skenario unit/E2E pada 16 berkas tes**, pemerik
 
 ```
 Test Suites: 16 passed, 16 total
-Tests:       48 passed, 48 total
+Tests:       70 passed, 70 total
 Snapshots:   0 total
-Time:        4.94s
+Time:        ~6.5s
 Linter:      tsc --noEmit (0 error)
 Build:       vite build (exit code 0)
 ```

@@ -7,6 +7,20 @@ Mengikuti Keep a Changelog dan SemVer. Perubahan Level S (`[MINOR]`) dan task re
 ## [Unreleased]
 
 ### Added
+- [TASK-REV-06] Kesiapan PWA Android WebAPK, Ikon PNG Fisik, Tautan Live HTTPS & Panduan Interaktif (`public/manifest.webmanifest`, `public/icon-*.png`, `src/components/PwaInstallGuideModal.tsx`, `TUTORIAL_INSTALL_PWA_ANDROID.md`, `tests/pwa-offline.test.ts`):
+  - Aset PNG WebAPK Fisik: Menghasilkan berkas PNG valid `public/icon-192.png`, `public/icon-512.png`, `public/icon-maskable-512.png` (dengan 15% safe-zone margin), dan `public/apple-touch-icon.png` (180x180 px) untuk memenuhi standar Android OS WebAPK.
+  - Tautan Live HTTPS Terverifikasi: Mencantumkan URL produksi (`https://ais-pre-67vxjndwqva5pmnr234qt6-557789186714.asia-southeast1.run.app`) dan alternatif dev di dokumen dan komponen UI.
+  - Kartu Tautan HTTPS & Pindai QR HP: Komponen modal instalasi PWA menyediakan tombol 1-ketuk salin URL dan generator kode QR langsung di layar untuk memudahkan scan via kamera HP.
+  - Panduan Penanganan In-App Browser: Panduan eksplisit untuk memilih menu ⋮ -> "Buka di Chrome" jika link dibuka dari browser bawaan WhatsApp atau Telegram.
+  - 10/10 test cases lulus di `tests/pwa-offline.test.ts` (total 70/70 tests lulus di 16 test files).
+- [TASK-REV-05] Filter Cepat Status Akun 'READY' pada Dashboard (`src/App.tsx`):
+  - Toggle filter cepat "Semua Akun" vs "Hanya READY" di tab Dashboard untuk menyaring kartu layanan secara dinamis.
+  - Menghitung jumlah akun yang siap digunakan secara real-time untuk mempercepat pergantian giliran kerja tim.
+- [TASK-REV-04] Sinkronisasi Google Sheets Mandiri & 1-Click Table Generator (`apps-script/Code.gs`, `src/backup/sheet-probe.ts`, `src/backup/apps-script-code.ts`, `src/App.tsx`, `tests/sheet-probe.test.ts`):
+  - Aksi `generate_default_tables` otomatis membuat dan memformat 6 tab sheet (`metadata`, `services`, `persons`, `access`, `logs`, `handoff`) dengan styling header gelap dan proteksi teks murni `@` (anti formula injection).
+  - Pembersihan otomatis lembar kerja kosong bawaan Google Sheets (`Sheet1`).
+  - Integrasi mandiri melalui Google Apps Script Web App tanpa ketergantungan basis data Firebase Firestore.
+  - 8/8 tests lulus di `tests/sheet-probe.test.ts`.
 - [MINOR] Penanganan Graceful Pembatalan Google Sign-In (`src/google/auth.ts`, `src/App.tsx`, `tests/google-sheets.test.ts`):
   - Menangani error `auth/popup-closed-by-user` dan `auth/cancelled-popup-request` secara graceful tanpa melempar exception atau memicu console error saat pengguna sengaja menutup jendela pop-up login.
   - Memberikan pesan interaktif yang jelas bila pop-up diblokir oleh browser (`auth/popup-blocked`).

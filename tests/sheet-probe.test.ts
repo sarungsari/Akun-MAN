@@ -9,6 +9,8 @@ import {
   buildBackupPayload,
   buildRestorePayload,
   probeAppsScript,
+  initSheetTables,
+  normalizeEndpointUrl,
   backupToSheet,
   restoreFromSheet,
 } from '../src/backup/sheet-probe';
@@ -111,5 +113,62 @@ describe('TASK-010: Apps Script Probe & Sheet Integration', () => {
 
     expect(res.success).toBe(false);
     expect(res.message).toContain('Akses ditolak');
+  });
+
+  it('normalizeEndpointUrl menangani URL tanpa /exec dan menolak editor script', () => {
+    const resNoExec = normalizeEndpointUrl('https://script.google.com/macros/s/AKfycb123');
+    expect(resNoExec.valid).toBe(true);
+    expect(resNoExec.url).toBe('https://script.google.com/macros/s/AKfycb123/exec');
+
+    const resEditor = normalizeEndpointUrl('https://script.google.com/home/projects/123/edit');
+    expect(resEditor.valid).toBe(false);
+    expect(resEditor.error).toContain('tautan editor');
+  });
+
+  it('initSheetTables memanggil action init_tables dan mengembalikan daftar tab', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        message: 'Tabel bawaan Google Sheets berhasil dibuat!',
+        spreadsheetName: 'AI_Account_Manager_Backup',
+        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/test123/edit',
+        tabs: [
+          { name: 'metadata', rowCount: 5 },
+          { name: 'services', rowCount: 5 },
+          { name: 'persons', rowCount: 0 },
+          { name: 'access', rowCount: 0 },
+          { name: 'logs', rowCount: 0 },
+          { name: 'handoff', rowCount: 0 },
+        ],
+      }),
+    } as any);
+
+    const res = await initSheetTables(
+      'https://script.google.com/macros/s/TEST_EXEC_ID/exec',
+      'correct-secret'
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.tabs?.length).toBe(6);
+    expect(res.spreadsheetUrl).toBe('https://docs.google.com/spreadsheets/d/test123/edit');
+  });
+
+  it('probeAppsScript mendeteksi halaman respon HTML login/error Google', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '<!DOCTYPE html><html><head><title>Google Accounts</title></head><body>Login required</body></html>',
+    } as any);
+
+    const res = await probeAppsScript(
+      'https://script.google.com/macros/s/TEST_EXEC_ID/exec',
+      'secret-123'
+    );
+
+    expect(res.success).toBe(false);
+    expect(res.message).toContain('halaman web HTML');
+    expect(res.message).toContain('Siapa saja');
   });
 });

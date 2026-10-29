@@ -73,6 +73,10 @@ export interface SheetOperationOutcome {
   message: string;
   timestamp?: string;
   snapshotCreated?: boolean;
+  spreadsheetName?: string;
+  spreadsheetUrl?: string;
+  spreadsheetId?: string;
+  counts?: any;
 }
 
 /**
@@ -84,7 +88,8 @@ export interface SheetOperationOutcome {
 export async function executeSheetBackup(
   endpoint: string,
   secret: string,
-  dbInstance?: IDBPDatabase
+  dbInstance?: IDBPDatabase,
+  spreadsheetId?: string
 ): Promise<SheetOperationOutcome> {
   const cleanEndpoint = endpoint.trim();
   const cleanSecret = secret.trim();
@@ -103,13 +108,18 @@ export async function executeSheetBackup(
     const result: SheetBackupResult = await backupToSheet(
       cleanEndpoint,
       cleanSecret,
-      parsedPayload.data
+      parsedPayload.data,
+      spreadsheetId
     );
 
     return {
       success: result.success,
       message: result.message,
       timestamp: result.backupTimestamp,
+      spreadsheetName: result.spreadsheetName,
+      spreadsheetUrl: result.spreadsheetUrl,
+      spreadsheetId: result.spreadsheetId,
+      counts: result.counts,
     };
   } catch (err: unknown) {
     return {
@@ -133,7 +143,8 @@ export async function executeSheetRestore(
   endpoint: string,
   secret: string,
   options?: ExecuteSheetRestoreOptions,
-  dbInstance?: IDBPDatabase
+  dbInstance?: IDBPDatabase,
+  spreadsheetId?: string
 ): Promise<SheetOperationOutcome> {
   const cleanEndpoint = endpoint.trim();
   const cleanSecret = secret.trim();
@@ -148,13 +159,17 @@ export async function executeSheetRestore(
   // 1. Ambil data dari Apps Script Web App
   const sheetResult: SheetRestoreResult = await restoreFromSheet(
     cleanEndpoint,
-    cleanSecret
+    cleanSecret,
+    spreadsheetId
   );
 
   if (!sheetResult.success || !sheetResult.data) {
     return {
       success: false,
       message: sheetResult.message || 'Gagal mengambil data dari Google Sheets.',
+      spreadsheetName: sheetResult.spreadsheetName,
+      spreadsheetUrl: sheetResult.spreadsheetUrl,
+      spreadsheetId: sheetResult.spreadsheetId,
     };
   }
 
@@ -256,6 +271,9 @@ export async function executeSheetRestore(
       message: 'Data berhasil dipulihkan dari Google Sheets ke penyimpanan lokal!',
       timestamp: new Date().toISOString(),
       snapshotCreated: snapshotSaved,
+      spreadsheetName: sheetResult.spreadsheetName,
+      spreadsheetUrl: sheetResult.spreadsheetUrl,
+      spreadsheetId: sheetResult.spreadsheetId,
     };
   } catch (importErr: unknown) {
     return {

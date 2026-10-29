@@ -93,6 +93,7 @@ import {
 } from './backup/json-backup';
 import { 
   probeAppsScript, 
+  initSheetTables,
   backupToSheet, 
   restoreFromSheet, 
   type ProbeResult 
@@ -175,6 +176,9 @@ export default function App() {
   // State Backup & Restore (TASK-009 & TASK-010)
   const [sheetEndpointInput, setSheetEndpointInput] = useState('');
   const [sheetSecretInput, setSheetSecretInput] = useState('');
+  const [sheetSpreadsheetIdInput, setSheetSpreadsheetIdInput] = useState('');
+  const [isGeneratingTables, setIsGeneratingTables] = useState(false);
+  const [showSchemaPreview, setShowSchemaPreview] = useState(false);
   const [probeResult, setProbeResult] = useState<ProbeResult | null>(null);
   const [isProbing, setIsProbing] = useState(false);
   const [backupNotice, setBackupNotice] = useState<string | null>(null);
@@ -245,6 +249,7 @@ export default function App() {
       setAppSettings(dbSettings);
       setSheetEndpointInput(dbSettings.sheetEndpoint || '');
       setSheetSecretInput(dbSettings.sheetSecret || '');
+      setSheetSpreadsheetIdInput(dbSettings.googleSpreadsheetId || '');
       if (allAccess.length > 0 && (!selectedAccessId || !allAccess.find((a) => a.id === selectedAccessId))) {
         setSelectedAccessId(allAccess[0].id);
       }
@@ -497,11 +502,12 @@ export default function App() {
         ...settings,
         sheetEndpoint: sheetEndpointInput.trim(),
         sheetSecret: sheetSecretInput.trim(),
+        googleSpreadsheetId: sheetSpreadsheetIdInput.trim() || undefined,
         updatedAt: new Date().toISOString(),
       };
       await saveSettings(updated);
       setAppSettings(updated);
-      setBackupNotice('Konfigurasi Google Apps Script berhasil disimpan secara lokal.');
+      setBackupNotice('Konfigurasi Google Apps Script & Spreadsheet ID berhasil disimpan secara lokal.');
     } catch (err: unknown) {
       if (err instanceof Error) setBackupError(err.message);
     }
@@ -514,10 +520,27 @@ export default function App() {
     setIsProbing(true);
 
     try {
-      const res = await probeAppsScript(sheetEndpointInput, sheetSecretInput);
+      const res = await probeAppsScript(
+        sheetEndpointInput,
+        sheetSecretInput,
+        sheetSpreadsheetIdInput.trim() || undefined
+      );
       setProbeResult(res);
       if (res.success) {
         setBackupNotice(`Probe Berhasil (${res.latencyMs}ms): ${res.message}`);
+        if (res.spreadsheetUrl || res.spreadsheetName) {
+          const updated: Settings = {
+            ...settings,
+            sheetEndpoint: sheetEndpointInput.trim(),
+            sheetSecret: sheetSecretInput.trim(),
+            googleSpreadsheetId: res.spreadsheetId || settings.googleSpreadsheetId,
+            googleSpreadsheetUrl: res.spreadsheetUrl || settings.googleSpreadsheetUrl,
+            googleSpreadsheetTitle: res.spreadsheetName || settings.googleSpreadsheetTitle,
+            updatedAt: new Date().toISOString(),
+          };
+          await saveSettings(updated);
+          setAppSettings(updated);
+        }
       } else {
         setBackupError(`Probe Gagal (${res.latencyMs}ms): ${res.message}`);
       }
@@ -525,6 +548,48 @@ export default function App() {
       if (err instanceof Error) setBackupError(err.message);
     } finally {
       setIsProbing(false);
+    }
+  };
+
+  const handleInitSheetTables = async () => {
+    if (!sheetEndpointInput || !sheetSecretInput) {
+      setBackupError('Isi Endpoint URL dan Kunci Rahasia terlebih dahulu.');
+      return;
+    }
+    setIsGeneratingTables(true);
+    setBackupNotice(null);
+    setBackupError(null);
+
+    try {
+      const res = await initSheetTables(
+        sheetEndpointInput,
+        sheetSecretInput,
+        sheetSpreadsheetIdInput.trim() || undefined
+      );
+      setProbeResult(res);
+      if (res.success) {
+        const tabListStr = res.tabs?.map((t) => `${t.name} (${t.rowCount} baris)`).join(', ') || 'metadata, services, persons, access, logs, handoff';
+        setBackupNotice(`Tabel bawaan Google Sheets berhasil dibuat dan diinisialisasi! Tab aktif: ${tabListStr}.`);
+        const updated: Settings = {
+          ...settings,
+          sheetEndpoint: sheetEndpointInput.trim(),
+          sheetSecret: sheetSecretInput.trim(),
+          googleSpreadsheetId: res.spreadsheetId || settings.googleSpreadsheetId,
+          googleSpreadsheetUrl: res.spreadsheetUrl || settings.googleSpreadsheetUrl,
+          googleSpreadsheetTitle: res.spreadsheetName || settings.googleSpreadsheetTitle,
+          lastGoogleSyncAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await saveSettings(updated);
+        setAppSettings(updated);
+        await loadAllData();
+      } else {
+        setBackupError(`Gagal membuat tabel bawaan di Sheet: ${res.message}`);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) setBackupError(err.message);
+    } finally {
+      setIsGeneratingTables(false);
     }
   };
 
@@ -538,9 +603,27 @@ export default function App() {
     setBackupError(null);
 
     try {
-      const res = await executeSheetBackup(sheetEndpointInput, sheetSecretInput);
+      const res = await executeSheetBackup(
+        sheetEndpointInput,
+        sheetSecretInput,
+        undefined,
+        sheetSpreadsheetIdInput.trim() || undefined
+      );
       if (res.success) {
-        setBackupNotice(`Cadangan berhasil disinkronkan ke seluruh tab Spreadsheet pada ${new Date(res.timestamp || '').toLocaleTimeString()}!`);
+        const timeStr = new Date(res.timestamp || new Date()).toLocaleTimeString('id-ID');
+        setBackupNotice(`Cadangan berhasil disinkronkan ke seluruh tab Spreadsheet pada pukul ${timeStr}!`);
+        const updated: Settings = {
+          ...settings,
+          sheetEndpoint: sheetEndpointInput.trim(),
+          sheetSecret: sheetSecretInput.trim(),
+          googleSpreadsheetId: res.spreadsheetId || settings.googleSpreadsheetId,
+          googleSpreadsheetUrl: res.spreadsheetUrl || settings.googleSpreadsheetUrl,
+          googleSpreadsheetTitle: res.spreadsheetName || settings.googleSpreadsheetTitle,
+          lastGoogleSyncAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await saveSettings(updated);
+        setAppSettings(updated);
       } else {
         setBackupError(`Gagal sinkronisasi ke Sheet: ${res.message}`);
       }
@@ -562,35 +645,53 @@ export default function App() {
     setBackupError(null);
 
     try {
-      const res = await executeSheetRestore(sheetEndpointInput, sheetSecretInput, {
-        confirmOverwrite: async ({ remote, local }) => {
-          return new Promise<boolean>((resolve) => {
-            setConfirmModalConfig({
-              isOpen: true,
-              title: 'Konfirmasi Pemulihan dari Google Sheets',
-              description: 'Memulihkan data akan menimpa seluruh akun, layanan, hak akses, dan riwayat di IndexedDB lokal dengan isi dari Google Sheets. Salinan pengaman lokal otomatis akan dibuat sebelum penimpaan (Fail-Closed).',
-              details: [
-                { label: 'Akun di Sheet', value: remote.persons },
-                { label: 'Layanan di Sheet', value: remote.services },
-                { label: 'Akses Layanan di Sheet', value: remote.access },
-                { label: 'Log Riwayat di Sheet', value: remote.logs },
-                { label: 'Catatan Lanjutan di Sheet', value: remote.handoffNotes },
-                { label: 'Total Entitas Remote', value: remote.total },
-                { label: 'Total Entitas Lokal Saat Ini', value: local.total },
-              ],
-              confirmLabel: 'Timpa Data Lokal & Pulihkan',
-              confirmVariant: 'danger',
-              action: async () => {
-                setConfirmModalConfig(null);
-                resolve(true);
-              },
+      const res = await executeSheetRestore(
+        sheetEndpointInput,
+        sheetSecretInput,
+        {
+          confirmOverwrite: async ({ remote, local }) => {
+            return new Promise<boolean>((resolve) => {
+              setConfirmModalConfig({
+                isOpen: true,
+                title: 'Konfirmasi Pemulihan dari Google Sheets',
+                description: 'Memulihkan data akan menimpa seluruh akun, layanan, hak akses, dan riwayat di IndexedDB lokal dengan isi dari Google Sheets. Salinan pengaman lokal otomatis akan dibuat sebelum penimpaan (Fail-Closed).',
+                details: [
+                  { label: 'Akun di Sheet', value: remote.persons },
+                  { label: 'Layanan di Sheet', value: remote.services },
+                  { label: 'Akses Layanan di Sheet', value: remote.access },
+                  { label: 'Log Riwayat di Sheet', value: remote.logs },
+                  { label: 'Catatan Lanjutan di Sheet', value: remote.handoffNotes },
+                  { label: 'Total Entitas Remote', value: remote.total },
+                  { label: 'Total Entitas Lokal Saat Ini', value: local.total },
+                ],
+                confirmLabel: 'Timpa Data Lokal & Pulihkan',
+                confirmVariant: 'danger',
+                action: async () => {
+                  setConfirmModalConfig(null);
+                  resolve(true);
+                },
+              });
             });
-          });
+          },
         },
-      });
+        undefined,
+        sheetSpreadsheetIdInput.trim() || undefined
+      );
 
       if (res.success) {
         setBackupNotice('Data berhasil dipulihkan dari Google Sheets! (Salinan pengaman lokal tersimpan otomatis).');
+        const updated: Settings = {
+          ...settings,
+          sheetEndpoint: sheetEndpointInput.trim(),
+          sheetSecret: sheetSecretInput.trim(),
+          googleSpreadsheetId: res.spreadsheetId || settings.googleSpreadsheetId,
+          googleSpreadsheetUrl: res.spreadsheetUrl || settings.googleSpreadsheetUrl,
+          googleSpreadsheetTitle: res.spreadsheetName || settings.googleSpreadsheetTitle,
+          lastGoogleSyncAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await saveSettings(updated);
+        setAppSettings(updated);
         await loadAllData();
       } else {
         setBackupError(`Gagal pemulihan dari Sheet: ${res.message}`);
@@ -1780,10 +1881,10 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Form Konfigurasi Endpoint & Kunci Rahasia */}
+              {/* Form Konfigurasi Endpoint, Kunci Rahasia & Spreadsheet ID */}
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div className="md:col-span-8 space-y-1 text-xs">
+                  <div className="md:col-span-6 space-y-1 text-xs">
                     <label className="text-slate-300 font-medium block">
                       URL Endpoint Web App (Deployment Google Apps Script):
                     </label>
@@ -1795,11 +1896,11 @@ export default function App() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-slate-200 focus:border-sky-500 focus:outline-none text-xs"
                     />
                     <p className="text-[11px] text-slate-500">
-                      Dapatkan URL ini dari menu <strong>Deploy &gt; New deployment &gt; Web app</strong> di Google Apps Script (Who has access: Anyone).
+                      URL dari menu <strong>Deploy &gt; New deployment &gt; Web app</strong> (Who has access: <strong>Anyone</strong>).
                     </p>
                   </div>
 
-                  <div className="md:col-span-4 space-y-1 text-xs">
+                  <div className="md:col-span-3 space-y-1 text-xs">
                     <label className="text-slate-300 font-medium block">
                       Kunci Rahasia (AUTH_SECRET_KEY):
                     </label>
@@ -1811,23 +1912,41 @@ export default function App() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-slate-200 focus:border-sky-500 focus:outline-none text-xs"
                     />
                     <p className="text-[11px] text-slate-500">
-                      Kunci autentikasi yang sama persis dengan yang disetel di skrip Apps Script Anda.
+                      Sama persis dengan AUTH_SECRET_KEY di Code.gs.
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-3 space-y-1 text-xs">
+                    <label className="text-slate-300 font-medium block">
+                      ID / URL Spreadsheet (Opsional):
+                    </label>
+                    <input
+                      type="text"
+                      value={sheetSpreadsheetIdInput}
+                      onChange={(e) => setSheetSpreadsheetIdInput(e.target.value)}
+                      placeholder="Kosongkan untuk buat otomatis"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-slate-200 focus:border-sky-500 focus:outline-none text-xs"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Tautkan sheet yang ada atau kosongkan untuk auto-create.
                     </p>
                   </div>
                 </div>
 
+                {/* Tombol Aksi: Simpan, Uji Probe, dan Generate Tabel Bawaan */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={handleSaveSettings}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
                     >
                       Simpan Pengaturan
                     </button>
+
                     <button
                       onClick={handleProbeAppsScript}
                       disabled={isProbing || !sheetEndpointInput || !sheetSecretInput}
-                      className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
                         isProbing || !sheetEndpointInput || !sheetSecretInput
                           ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-800'
                           : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20'
@@ -1835,6 +1954,27 @@ export default function App() {
                     >
                       <Radio className={`w-3.5 h-3.5 ${isProbing ? 'animate-pulse' : ''}`} />
                       {isProbing ? 'Menguji Koneksi...' : 'Uji Koneksi (Test Probe)'}
+                    </button>
+
+                    <button
+                      onClick={handleInitSheetTables}
+                      disabled={isGeneratingTables || !sheetEndpointInput || !sheetSecretInput}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+                        isGeneratingTables || !sheetEndpointInput || !sheetSecretInput
+                          ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-800'
+                          : 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-md shadow-sky-600/20'
+                      }`}
+                      title="Buat seluruh 6 tab (metadata, services, persons, access, logs, handoff) dengan styling rapi di Google Sheets"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${isGeneratingTables ? 'animate-spin' : 'text-sky-200'}`} />
+                      {isGeneratingTables ? 'Membuat Tabel...' : 'Generate Tabel Bawaan Google Sheets'}
+                    </button>
+
+                    <button
+                      onClick={() => setShowSchemaPreview(!showSchemaPreview)}
+                      className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition"
+                    >
+                      {showSchemaPreview ? 'Sembunyikan Skema Tabel' : 'Lihat Skema 6 Tabel'}
                     </button>
                   </div>
 
@@ -1845,83 +1985,73 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Banner Hasil Uji Probe */}
-                {probeResult && (
-                  <div className={`p-4 rounded-xl border text-xs space-y-2 animate-in fade-in ${
-                    probeResult.success 
-                      ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' 
-                      : 'bg-rose-950/60 border-rose-800 text-rose-300'
-                  }`}>
-                    <div className="flex items-center justify-between font-bold text-sm">
-                      <div className="flex items-center gap-2">
-                        {probeResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-400" />}
-                        <span>{probeResult.success ? 'Koneksi Apps Script Berhasil Terverifikasi' : 'Uji Koneksi Gagal'}</span>
-                      </div>
-                      <span className="font-mono text-xs px-2 py-0.5 rounded bg-black/40">
-                        {probeResult.latencyMs}ms
-                      </span>
+                {/* Banner Spreadsheet Terhubung Aktif */}
+                {(settings.googleSpreadsheetUrl || probeResult?.spreadsheetUrl) && (
+                  <div className="p-3.5 rounded-xl bg-slate-950/90 border border-emerald-900/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-slate-400">Spreadsheet Google Sheets Terhubung:</span>
+                      <strong className="text-white font-semibold">
+                        {settings.googleSpreadsheetTitle || probeResult?.spreadsheetName || 'AI_Account_Manager_Backup'}
+                      </strong>
                     </div>
-
-                    <p className="text-xs leading-relaxed">{probeResult.message}</p>
-
-                    {probeResult.success && probeResult.spreadsheetUrl && (
-                      <div className="pt-2 border-t border-emerald-800/60 flex flex-wrap items-center justify-between gap-3 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-emerald-400 font-semibold">Spreadsheet:</span>
-                          <span className="font-bold text-white">{probeResult.spreadsheetName || 'AI_Account_Manager_Backup'}</span>
-                        </div>
-                        <a
-                          href={probeResult.spreadsheetUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1 rounded-lg bg-emerald-900/80 hover:bg-emerald-800 text-white font-medium flex items-center gap-1 transition"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          Buka di Google Sheets
-                        </a>
-                      </div>
-                    )}
-
-                    {probeResult.tabs && probeResult.tabs.length > 0 && (
-                      <div className="pt-2 flex flex-wrap gap-2">
-                        {probeResult.tabs.map((tab, idx) => (
-                          <span key={idx} className="text-[11px] px-2 py-0.5 rounded-md bg-black/30 border border-emerald-800/80 text-emerald-200">
-                            {tab.name}: <strong>{tab.rowCount} baris</strong>
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <a
+                      href={settings.googleSpreadsheetUrl || probeResult?.spreadsheetUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1.5 transition shadow"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Buka Google Sheets Langsung
+                    </a>
                   </div>
                 )}
 
-                {/* Tombol Eksekusi Backup & Restore Sheet */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <button
-                    onClick={handleSyncToSheet}
-                    disabled={isSyncingSheet || !sheetEndpointInput || !sheetSecretInput}
-                    className={`p-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2.5 shadow-lg transition ${
-                      isSyncingSheet || !sheetEndpointInput || !sheetSecretInput
-                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-800'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
-                    }`}
-                  >
-                    <Upload className="w-4 h-4" />
-                    <span>{isSyncingSheet ? 'Menyinkronkan...' : 'Cadangkan Data ke Google Sheet (Unggah)'}</span>
-                  </button>
+                {/* Skema 6 Tabel Bawaan Drawer */}
+                {showSchemaPreview && (
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3 text-xs animate-in fade-in">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                      <h4 className="font-bold text-slate-200 flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-sky-400" />
+                        Struktur 6 Tabel Bawaan Google Sheets (Auto-Generated)
+                      </h4>
+                      <span className="text-[10px] text-slate-400 font-mono">Format Teks Murni & Anti-Formula Injection</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="font-semibold text-emerald-400 font-mono text-[11px]">1. metadata</div>
+                        <p className="text-[11px] text-slate-400">key, value, updatedAt</p>
+                        <p className="text-[10px] text-slate-500 italic">Menyimpan konfigurasi zona waktu, versi, & limit akun</p>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="font-semibold text-sky-400 font-mono text-[11px]">2. services</div>
+                        <p className="text-[11px] text-slate-400">id, name, urlTemplate, usesAuthuser, resetRule, createdAt, updatedAt</p>
+                        <p className="text-[10px] text-slate-500 italic">Daftar layanan AI & aturan reset waktu</p>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="font-semibold text-indigo-400 font-mono text-[11px]">3. persons</div>
+                        <p className="text-[11px] text-slate-400">id, ownerName, googleEmail, label, note, createdAt, updatedAt</p>
+                        <p className="text-[10px] text-slate-500 italic">Akun Google pengguna (maks. 10 akun)</p>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="font-semibold text-purple-400 font-mono text-[11px]">4. access</div>
+                        <p className="text-[11px] text-slate-400">id, personId, serviceId, loginMethod, loginName, status, limitedAt, resetAt, activeSessionStart, createdAt, updatedAt</p>
+                        <p className="text-[10px] text-slate-500 italic">Hak akses akun x layanan & status limit reset</p>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="font-semibold text-amber-400 font-mono text-[11px]">5. logs</div>
+                        <p className="text-[11px] text-slate-400">id, accessId, type, at, durationSec, detail</p>
+                        <p className="text-[10px] text-slate-500 italic">Audit trail kejadian buka, stop, limit</p>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="font-semibold text-rose-400 font-mono text-[11px]">6. handoff</div>
+                        <p className="text-[11px] text-slate-400">id, serviceId, accessId, authorName, text, createdAt</p>
+                        <p className="text-[10px] text-slate-500 italic">Catatan lanjutan bersama tim per layanan</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                  <button
-                    onClick={handleRestoreFromSheet}
-                    disabled={isSyncingSheet || !sheetEndpointInput || !sheetSecretInput}
-                    className={`p-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2.5 border transition ${
-                      isSyncingSheet || !sheetEndpointInput || !sheetSecretInput
-                        ? 'bg-slate-800 text-slate-500 border-slate-800 cursor-not-allowed'
-                        : 'bg-indigo-950 hover:bg-indigo-900 border-indigo-800 text-indigo-200'
-                    }`}
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>{isSyncingSheet ? 'Mengambil Data...' : 'Pulihkan Data dari Google Sheet (Unduh)'}</span>
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -1998,21 +2128,22 @@ export default function App() {
 
                   <div className="overflow-y-auto space-y-4 text-xs pr-1">
                     <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
-                      <h4 className="font-bold text-slate-200">Cara Memasang di Google Drive Anda (Gratis & Mandiri):</h4>
+                      <h4 className="font-bold text-slate-200">Cara Memasang di Google Drive Anda (Gratis & Tanpa Firebase):</h4>
                       <ol className="list-decimal list-inside space-y-1.5 text-slate-300 leading-relaxed">
                         <li>Buka <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-sky-400 underline font-semibold">script.google.com</a> dan klik tombol <strong>+ Proyek baru</strong>.</li>
                         <li>Hapus semua teks default di editor, lalu tempel kode skrip di bawah ini ke <code>Code.gs</code>.</li>
-                        <li>Ubah variabel <code>AUTH_SECRET_KEY</code> di baris 17 dengan kata sandi rahasia yang Anda tentukan sendiri.</li>
+                        <li>Ubah variabel <code>AUTH_SECRET_KEY</code> dengan kata sandi rahasia yang Anda tentukan sendiri.</li>
                         <li>Klik <strong>Deploy &gt; Deployment baru</strong> (New deployment).</li>
-                        <li>Klik ikon roda gigi, pilih jenis <strong>Aplikasi web</strong> (Web app).</li>
-                        <li>Set <strong>Jalankan sebagai:</strong> <em>Saya</em> (Me), dan <strong>Siapa yang memiliki akses:</strong> <em>Siapa saja</em> (Anyone).</li>
-                        <li>Klik <strong>Deploy</strong>, izinkan akses saat diminta, lalu salin URL yang berakhiran <code>/exec</code> ke kolom Endpoint di aplikasi ini.</li>
+                        <li>Klik ikon roda gigi di sebelah "Pilih jenis", pilih jenis <strong>Aplikasi web</strong> (Web app).</li>
+                        <li>Set <strong>Jalankan sebagai:</strong> <em>Saya</em> (Me), dan <strong>Siapa yang memiliki akses:</strong> <em>Siapa saja</em> (Anyone) <span className="text-amber-400 font-semibold">(Wajib agar tidak error HTML login)</span>.</li>
+                        <li>Klik <strong>Deploy</strong>, izinkan akses Google saat diminta, lalu salin URL yang berakhiran <code>/exec</code> ke kolom Endpoint di aplikasi ini.</li>
+                        <li>Setelah menyimpan pengaturan, klik tombol <strong>"Generate Tabel Bawaan Google Sheets"</strong> untuk otomatis membuat 6 tab terformat rapi di Spreadsheet Anda!</li>
                       </ol>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-slate-400 text-[11px]">Kode Skrip: Code.gs (Versi 2.0 Optimized)</span>
+                        <span className="font-mono text-slate-400 text-[11px]">Kode Skrip: Code.gs (Versi 2.1 Optimized)</span>
                         <button
                           onClick={handleCopyCode}
                           className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 transition"

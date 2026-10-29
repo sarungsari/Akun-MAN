@@ -3,15 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  * 
  * Google Apps Script Web App untuk AI Account Manager (PWA)
- * Versi: 2.0 (Optimized & Hardened)
+ * Versi: 2.1 (Optimized, Self-Healing & Default Tables Generator)
  * 
  * Fitur & Optimasi:
  * 1. Skema kolom tetap (SCHEMAS) menjamin semua atribut (termasuk status limit, durasi, resetAt) terjaga.
- * 2. Tab Metadata: Menyimpan konfigurasi aplikasi (resetTimezone, maxPersons, statistik pencadangan).
- * 3. Proteksi Formula Injection: Format teks murni ('@') dan sanitasi karakter formula (=, +, -, @).
- * 4. Tampilan Spreadsheet Profesional: Header navy (#1e293b), teks putih tebal, baris header dibekukan (freeze), auto-fit lebar kolom.
- * 5. Batch processing: Menggunakan setValues() & getDisplayValues() untuk performa maksimal.
- * 6. Diagnosis Lengkap: Aksi "ping" memberikan informasi nama, URL, dan jumlah baris per tab.
+ * 2. Generator Tabel Bawaan (init_tables): Otomatis membuat seluruh 6 tab (metadata, services, persons, access, logs, handoff).
+ * 3. Seed Bawaan Otomatis: Menyediakan 5 layanan AI default (AI Studio, Claude, ChatGPT, Grok, Perplexity) & metadata awal.
+ * 4. Dukungan Spreadsheet ID/URL Kustom: Pengguna dapat menautkan Spreadsheet Google yang sudah ada via ID atau URL.
+ * 5. Proteksi Formula Injection: Format teks murni ('@') dan sanitasi karakter formula (=, +, -, @).
+ * 6. Tampilan Spreadsheet Profesional: Header slate-800 (#1e293b), teks putih tebal, baris header dibekukan (freeze), auto-fit lebar kolom.
+ * 7. Batch processing: Menggunakan setValues() & getDisplayValues() untuk performa maksimal.
+ * 8. Diagnosis Lengkap: Aksi "ping" & "init_tables" memberikan informasi nama, URL, dan jumlah baris per tab.
  */
 
 // Kunci rahasia default (Dapat diubah di sini atau di Script Properties: AUTH_SECRET_KEY)
@@ -41,14 +43,14 @@ var TYPES = {
 function doGet(e) {
   return createJsonResponse({
     status: "ok",
-    version: "2.0.0",
+    version: "2.1.0",
     message: "AI Account Manager Apps Script Web App aktif. Gunakan POST dengan format JSON text/plain untuk berinteraksi.",
     timestamp: new Date().toISOString()
   });
 }
 
 /**
- * Endpoint POST: Menangani ping, backup, dan restore
+ * Endpoint POST: Menangani ping, init_tables, backup, dan restore
  */
 function doPost(e) {
   try {
@@ -77,7 +79,7 @@ function doPost(e) {
     }
 
     var action = requestData.action || "ping";
-    var ss = getOrCreateSpreadsheet(scriptProps);
+    var ss = getOrCreateSpreadsheet(scriptProps, requestData);
 
     // 2. Aksi: Ping (Probe Latensi & Diagnostik Koneksi)
     if (action === "ping") {
@@ -102,7 +104,22 @@ function doPost(e) {
       });
     }
 
-    // 3. Aksi: Backup (PWA -> Google Sheets)
+    // 3. Aksi: Inisialisasi / Generate Tabel Bawaan Google Sheets (init_tables)
+    if (action === "init_tables" || action === "generate_tables") {
+      var tabsResult = initDefaultTables(ss);
+
+      return createJsonResponse({
+        success: true,
+        message: "Tabel bawaan Google Sheets (metadata, services, persons, access, logs, handoff) berhasil dibuat dan diformat!",
+        timestamp: new Date().toISOString(),
+        spreadsheetId: ss.getId(),
+        spreadsheetName: ss.getName(),
+        spreadsheetUrl: ss.getUrl(),
+        tabs: tabsResult
+      });
+    }
+
+    // 4. Aksi: Backup (PWA -> Google Sheets)
     if (action === "backup") {
       var backupData = requestData.data || {};
       var nowIso = new Date().toISOString();
@@ -110,7 +127,7 @@ function doPost(e) {
       // Siapkan baris metadata
       var metaRows = [
         { key: "appName", value: "AI Account Manager (PWA)", updatedAt: nowIso },
-        { key: "appVersion", value: "1.1.0", updatedAt: nowIso },
+        { key: "appVersion", value: "2.1.0", updatedAt: nowIso },
         { key: "lastBackupAt", value: nowIso, updatedAt: nowIso },
         { key: "resetTimezone", value: (backupData.settings && backupData.settings.resetTimezone) || "America/Los_Angeles", updatedAt: nowIso },
         { key: "maxPersons", value: String((backupData.settings && backupData.settings.maxPersons) || 10), updatedAt: nowIso }
@@ -123,10 +140,14 @@ function doPost(e) {
       var countHandoff  = writeToSheet(ss, "handoff", backupData.handoffNotes || []);
       writeToSheet(ss, "metadata", metaRows);
 
+      // Bersihkan sheet bawaan kosong 'Sheet1' jika ada
+      cleanupEmptyDefaultSheets(ss);
+
       return createJsonResponse({
         success: true,
-        message: "Pencadangan berhasil! Data tersimpan di spreadsheet Google Sheets.",
+        message: "Pencadangan berhasil! Seluruh data tersimpan di spreadsheet Google Sheets.",
         backupTimestamp: nowIso,
+        spreadsheetId: ss.getId(),
         spreadsheetName: ss.getName(),
         spreadsheetUrl: ss.getUrl(),
         counts: {
@@ -140,7 +161,7 @@ function doPost(e) {
       });
     }
 
-    // 4. Aksi: Restore (Google Sheets -> PWA)
+    // 5. Aksi: Restore (Google Sheets -> PWA)
     if (action === "restore") {
       var restoredServices = readFromSheet(ss, "services");
       var restoredPersons  = readFromSheet(ss, "persons");
@@ -177,13 +198,17 @@ function doPost(e) {
       return createJsonResponse({
         success: true,
         message: "Data berhasil dipulihkan dari Google Sheets.",
+        spreadsheetId: ss.getId(),
+        spreadsheetName: ss.getName(),
+        spreadsheetUrl: ss.getUrl(),
         data: restored,
         counts: {
           services: restoredServices.length,
           persons: restoredPersons.length,
           access: restoredAccess.length,
           logs: restoredLogs.length,
-          handoffNotes: restoredHandoff.length
+          handoffNotes: restoredHandoff.length,
+          total: restoredServices.length + restoredPersons.length + restoredAccess.length + restoredLogs.length + restoredHandoff.length
         }
       });
     }
@@ -201,8 +226,26 @@ function doPost(e) {
 /**
  * Mengambil Spreadsheet aktif atau membuka/membuat spreadsheet baru
  */
-function getOrCreateSpreadsheet(scriptProps) {
+function getOrCreateSpreadsheet(scriptProps, requestData) {
   var ss = null;
+
+  // Jika pengguna menentukan ID atau URL Spreadsheet eksplisit
+  var customSpreadsheetInput = requestData && requestData.spreadsheetId ? String(requestData.spreadsheetId).trim() : "";
+  if (customSpreadsheetInput) {
+    var extractedId = customSpreadsheetInput;
+    var urlMatch = customSpreadsheetInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (urlMatch && urlMatch[1]) {
+      extractedId = urlMatch[1];
+    }
+    try {
+      ss = SpreadsheetApp.openById(extractedId);
+      scriptProps.setProperty("SPREADSHEET_ID", extractedId);
+      return ss;
+    } catch (e) {
+      throw new Error("Gagal membuka Spreadsheet (" + extractedId + "): " + e.message + ". Pastikan ID/URL valid dan akun pembuat Apps Script memiliki izin akses.");
+    }
+  }
+
   try {
     ss = SpreadsheetApp.getActiveSpreadsheet();
   } catch (e) {
@@ -223,6 +266,128 @@ function getOrCreateSpreadsheet(scriptProps) {
   var newSs = SpreadsheetApp.create("AI_Account_Manager_Backup");
   scriptProps.setProperty("SPREADSHEET_ID", newSs.getId());
   return newSs;
+}
+
+/**
+ * Membuat tabel bawaan (schemas) di Google Sheets dan menyematkan styling profesional
+ */
+function initDefaultTables(ss) {
+  var tabNames = ['metadata', 'services', 'persons', 'access', 'logs', 'handoff'];
+
+  for (var i = 0; i < tabNames.length; i++) {
+    var name = tabNames[i];
+    var sheet = ss.getSheetByName(name);
+    var isNew = false;
+    if (!sheet) {
+      sheet = ss.insertSheet(name);
+      isNew = true;
+    }
+
+    var headers = SCHEMAS[name];
+    var lastRow = sheet.getLastRow();
+
+    if (lastRow === 0 || isNew) {
+      sheet.clear();
+      sheet.appendRow(headers);
+      formatHeaderRow(sheet, headers.length);
+
+      // Seed data awal jika tab metadata atau services masih kosong
+      if (name === 'metadata') {
+        var nowIso = new Date().toISOString();
+        var defaultMeta = [
+          { key: "appName", value: "AI Account Manager (PWA)", updatedAt: nowIso },
+          { key: "appVersion", value: "2.1.0", updatedAt: nowIso },
+          { key: "resetTimezone", value: "America/Los_Angeles", updatedAt: nowIso },
+          { key: "maxPersons", value: "10", updatedAt: nowIso },
+          { key: "initializedAt", value: nowIso, updatedAt: nowIso }
+        ];
+        writeToSheet(ss, 'metadata', defaultMeta);
+      } else if (name === 'services') {
+        var defaultServices = [
+          {
+            id: 'svc-ai-studio',
+            name: 'Google AI Studio',
+            urlTemplate: 'https://aistudio.google.com/',
+            usesAuthuser: true,
+            resetRule: { mode: 'pacific_midnight' },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'svc-claude',
+            name: 'Claude',
+            urlTemplate: 'https://claude.ai/',
+            usesAuthuser: false,
+            resetRule: { mode: 'duration', hours: 5 },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'svc-chatgpt',
+            name: 'ChatGPT',
+            urlTemplate: 'https://chatgpt.com/',
+            usesAuthuser: false,
+            resetRule: { mode: 'duration', hours: 3 },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'svc-grok',
+            name: 'Grok',
+            urlTemplate: 'https://x.com/i/grok',
+            usesAuthuser: false,
+            resetRule: { mode: 'duration', hours: 2 },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'svc-perplexity',
+            name: 'Perplexity',
+            urlTemplate: 'https://www.perplexity.ai/',
+            usesAuthuser: false,
+            resetRule: { mode: 'duration', hours: 4 },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ];
+        writeToSheet(ss, 'services', defaultServices);
+      }
+    } else {
+      formatHeaderRow(sheet, headers.length);
+    }
+  }
+
+  cleanupEmptyDefaultSheets(ss);
+
+  var resultTabs = [];
+  var finalSheets = ss.getSheets();
+  for (var f = 0; f < finalSheets.length; f++) {
+    var cur = finalSheets[f];
+    resultTabs.push({
+      name: cur.getName(),
+      rowCount: Math.max(0, cur.getLastRow() - 1)
+    });
+  }
+
+  return resultTabs;
+}
+
+/**
+ * Menghapus sheet kosong default bawaan Spreadsheet ('Sheet1' / 'Halaman 1')
+ */
+function cleanupEmptyDefaultSheets(ss) {
+  var allSheets = ss.getSheets();
+  if (allSheets.length > 1) {
+    for (var k = 0; k < allSheets.length; k++) {
+      var s = allSheets[k];
+      var sName = s.getName().trim().toLowerCase();
+      if ((sName === 'sheet1' || sName === 'sheet 1' || sName === 'halaman1' || sName === 'halaman 1') && s.getLastRow() <= 1) {
+        try {
+          ss.deleteSheet(s);
+        } catch (delErr) {}
+      }
+    }
+  }
 }
 
 /**

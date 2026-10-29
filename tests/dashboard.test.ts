@@ -8,6 +8,7 @@ import type { Access, Person } from '../src/storage/types';
 import {
   getReadyCountSinceLastOpen,
   getNextReadyAccountSuggestion,
+  filterAccessesByStatus,
 } from '../src/ui/dashboard-helper';
 
 describe('dashboard.test', () => {
@@ -61,5 +62,23 @@ describe('dashboard.test', () => {
     const suggestionAllLimited = getNextReadyAccountSuggestion('srv-claude', 'p-1', allLimitedAccesses, mockPersons, baseNow);
     expect(suggestionAllLimited.suggestedAccess?.id).toBe('a-1'); // p-1 reset jam 14:00 (lebih cepat dari 15:00)
     expect(suggestionAllLimited.reason).toContain('reset paling cepat');
+  });
+
+  it('filter_accesses_by_status - memfilter hanya akses berstatus READY ketika filter aktif', () => {
+    const mixedAccesses: Access[] = [
+      { id: 'a-1', personId: 'p-1', serviceId: 'srv-1', loginMethod: 'google', status: 'ready', createdAt: '', updatedAt: '' },
+      { id: 'a-2', personId: 'p-2', serviceId: 'srv-1', loginMethod: 'google', status: 'limited', createdAt: '', updatedAt: '' },
+      { id: 'a-3', personId: 'p-3', serviceId: 'srv-1', loginMethod: 'google', status: 'ready', createdAt: '', updatedAt: '' },
+    ];
+
+    // Filter 'ALL' harus mengembalikan semua (3)
+    const allResult = filterAccessesByStatus(mixedAccesses, 'ALL');
+    expect(allResult.length).toBe(3);
+
+    // Filter 'READY' harus mengembalikan hanya akses ready (2: a-1 dan a-3)
+    const readyResult = filterAccessesByStatus(mixedAccesses, 'READY');
+    expect(readyResult.length).toBe(2);
+    expect(readyResult.map((a) => a.id)).toEqual(['a-1', 'a-3']);
+    expect(readyResult.every((a) => a.status === 'ready')).toBe(true);
   });
 });

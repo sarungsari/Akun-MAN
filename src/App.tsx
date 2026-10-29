@@ -40,7 +40,8 @@ import {
   BookOpen,
   Wifi,
   WifiOff,
-  Smartphone
+  Smartphone,
+  Filter
 } from 'lucide-react';
 import { RecoveryGenerator } from './components/RecoveryGenerator';
 import { 
@@ -109,6 +110,7 @@ import {
 } from './pwa/register-sw';
 import { APPS_SCRIPT_CODE_GS } from './backup/apps-script-code';
 import { ConfirmationModal } from './components/ConfirmationModal';
+import { PwaInstallGuideModal } from './components/PwaInstallGuideModal';
 import { Copy, Code, Check } from 'lucide-react';
 
 interface TaskItem {
@@ -153,6 +155,9 @@ export default function App() {
   // State Banner Auto-Ready on Open (BR-06)
   const [autoReadyCount, setAutoReadyCount] = useState<number>(0);
   const [dismissAutoReadyBanner, setDismissAutoReadyBanner] = useState(false);
+
+  // State Filter Cepat Dashboard Status READY
+  const [dashboardStatusFilter, setDashboardStatusFilter] = useState<'ALL' | 'READY'>('ALL');
 
   // State Sesi Pemakaian (TASK-006)
   const [selectedAccessId, setSelectedAccessId] = useState<string>('');
@@ -234,6 +239,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [canInstallPwa, setCanInstallPwa] = useState<boolean>(false);
   const [pwaInstallSuccess, setPwaInstallSuccess] = useState<string | null>(null);
+  const [showPwaGuideModal, setShowPwaGuideModal] = useState<boolean>(false);
 
   const loadAllData = async () => {
     try {
@@ -824,6 +830,7 @@ export default function App() {
   const currentAccess = accessList.find((a) => a.id === selectedAccessId);
   const currentPerson = persons.find((p) => p.id === currentAccess?.personId);
   const currentService = services.find((s) => s.id === currentAccess?.serviceId);
+  const totalReadyAccounts = accessList.filter((a) => a.status === 'ready').length;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-white">
@@ -853,6 +860,15 @@ export default function App() {
                 <span>Pasang PWA</span>
               </button>
             )}
+
+            <button
+              onClick={() => setShowPwaGuideModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 shadow-sm transition"
+              title="Panduan Instalasi & Berkas PWA Android"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-sky-400" />
+              <span>Panduan Android</span>
+            </button>
 
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
               isOnline
@@ -1073,6 +1089,69 @@ export default function App() {
               </div>
             </div>
 
+            {/* Quick Filter Bar (Filter Status Akun READY) */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition ${
+                  dashboardStatusFilter === 'READY'
+                    ? 'bg-emerald-950 border border-emerald-700 text-emerald-400'
+                    : 'bg-slate-800 text-slate-400'
+                }`}>
+                  <Filter className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white">Filter Cepat Status Akun</h3>
+                    {dashboardStatusFilter === 'READY' && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold animate-in fade-in">
+                        Hanya READY Aktif
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {dashboardStatusFilter === 'READY'
+                      ? `Menampilkan ${totalReadyAccounts} akun yang siap digunakan langsung.`
+                      : `Menampilkan seluruh ${accessList.length} akun (READY & LIMITED).`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDashboardStatusFilter('ALL')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+                    dashboardStatusFilter === 'ALL'
+                      ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <span>Semua Akun</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-950 text-slate-300 font-mono">
+                    {accessList.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDashboardStatusFilter('READY')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
+                    dashboardStatusFilter === 'READY'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                      : 'bg-emerald-950/60 text-emerald-400 border border-emerald-900/60 hover:bg-emerald-900/80'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Hanya READY</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    dashboardStatusFilter === 'READY' ? 'bg-emerald-800 text-white' : 'bg-emerald-900 text-emerald-300'
+                  }`}>
+                    {totalReadyAccounts}
+                  </span>
+                </button>
+              </div>
+            </div>
+
             {/* Empty Services Warning */}
             {services.length === 0 && (
               <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
@@ -1096,6 +1175,7 @@ export default function App() {
                 const svcAccesses = accessList.filter((a) => a.serviceId === svc.id);
                 const readyAccesses = svcAccesses.filter((a) => a.status === 'ready');
                 const limitedAccesses = svcAccesses.filter((a) => a.status === 'limited');
+                const displayedAccesses = dashboardStatusFilter === 'READY' ? readyAccesses : svcAccesses;
                 const suggestion = getNextReadyAccountSuggestion(
                   svc.id,
                   currentPerson?.id || null,
@@ -1181,11 +1261,31 @@ export default function App() {
 
                       {/* Daftar Akun Terhubung */}
                       <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                        <label className="text-[11px] font-medium text-slate-400 block">Daftar Akun Terdaftar ({svcAccesses.length}):</label>
-                        {svcAccesses.length === 0 ? (
-                          <p className="text-xs text-slate-500 italic py-2">Belum ada akun yang dihubungkan ke layanan ini.</p>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-medium text-slate-400 block">
+                            {dashboardStatusFilter === 'READY'
+                              ? `Akun Siap Pakai (${displayedAccesses.length} READY):`
+                              : `Daftar Akun Terdaftar (${svcAccesses.length}):`}
+                          </label>
+                          {dashboardStatusFilter === 'READY' && (
+                            <span className="text-[10px] text-emerald-400 font-mono">
+                              {readyAccesses.length} dari {svcAccesses.length} Ready
+                            </span>
+                          )}
+                        </div>
+                        {displayedAccesses.length === 0 ? (
+                          dashboardStatusFilter === 'READY' && svcAccesses.length > 0 ? (
+                            <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-900/50 text-amber-300 text-xs flex items-start gap-2">
+                              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                              <p>
+                                Tidak ada akun berstatus READY saat ini. Seluruh {svcAccesses.length} akun pada layanan ini berstatus LIMITED (menunggu reset).
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-500 italic py-2">Belum ada akun yang dihubungkan ke layanan ini.</p>
+                          )
                         ) : (
-                          svcAccesses.map((acc) => {
+                          displayedAccesses.map((acc) => {
                             const p = persons.find((per) => per.id === acc.personId);
                             const cd = acc.status === 'limited' && acc.resetAt 
                               ? getRemainingCountdown(acc.resetAt, currentTime).formatted
@@ -2707,6 +2807,15 @@ export default function App() {
           onCancel={() => setConfirmModalConfig(null)}
         />
       )}
+
+      {/* Modal Panduan Instalasi PWA di Android */}
+      <PwaInstallGuideModal
+        isOpen={showPwaGuideModal}
+        onClose={() => setShowPwaGuideModal(false)}
+        canInstall={canInstallPwa}
+        onInstall={handleInstallClick}
+        isOnline={isOnline}
+      />
 
       {/* Footer Info */}
       <footer className="border-t border-slate-800/80 bg-slate-950 py-3 px-4 sm:px-6 text-center text-xs text-slate-500">

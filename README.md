@@ -205,13 +205,15 @@ Fitur ini memanfaatkan Google Apps Script Web App mandiri (`Code.gs` v2.1) yang 
 
 ## PWA dan Mode Offline
 
-Aplikasi menerapkan standar Progressive Web App (PWA) lengkap:
+Aplikasi menerapkan standar Progressive Web App (PWA) lengkap yang dapat dipasang di Android, iOS, maupun Desktop:
 
-- **Manifest Web**: Lengkap dengan ikon 192px dan 512px bertema gelap.
+- **Tautan Live HTTPS (Siap Pasang)**:
+  - Produksi / Publik: `https://ais-pre-67vxjndwqva5pmnr234qt6-557789186714.asia-southeast1.run.app`
+  - Pengembangan / Dev: `https://ais-dev-67vxjndwqva5pmnr234qt6-557789186714.asia-southeast1.run.app`
+- **Panduan Android Lengkap**: Lihat [`TUTORIAL_INSTALL_PWA_ANDROID.md`](TUTORIAL_INSTALL_PWA_ANDROID.md) untuk panduan instalasi WebAPK di Google Chrome, Samsung Internet, Brave, Edge, serta tips menghindari perangkap in-app browser (WhatsApp/Telegram).
+- **Manifest Web (`public/manifest.webmanifest`)**: Mendukung mode `standalone`, splash screen tema gelap, dan ikon PNG resolusi tinggi (192px, 512px, serta maskable adaptif).
 - **Service Worker (`public/sw.js`)**:
-  - Pre-caching bundel aset produksi via `dist/asset-manifest.json`.
-  - Cache-first dengan runtime caching cadangan.
-  - Fallback navigasi SPA yang aman.
+  - Pre-caching aset aplikasi statis dan runtime fallback navigasi SPA saat offline.
   - Bypass otomatis untuk request ke origin eksternal (Google Apps Script).
 - **Offline Indikator**: Banner status jaringan otomatis mendeteksi saat perangkat online atau beralih ke mode pesawat/offline.
 
@@ -303,6 +305,7 @@ Aplikasi siap di-deploy ke hosting statis mana pun yang mendukung HTTPS:
 
 ## Dokumentasi Terkait
 
+- [`TUTORIAL_INSTALL_PWA_ANDROID.md`](TUTORIAL_INSTALL_PWA_ANDROID.md) — Panduan instalasi PWA di Android beserta tautan HTTPS & checklist pengujian.
 - [`BLUEPRINT.md`](BLUEPRINT.md) — Spesifikasi teknis, aturan bisnis, dan NFR.
 - [`AI_WORKFLOW.md`](AI_WORKFLOW.md) — Standar alur kerja, konvensi kode, dan guardrail.
 - [`SESSION_STATE.md`](SESSION_STATE.md) — Status checkpoint dan catatan implementasi.

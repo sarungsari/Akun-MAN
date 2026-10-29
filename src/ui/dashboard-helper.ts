@@ -116,3 +116,17 @@ export function getNextReadyAccountSuggestion(
       : 'Akun ini berstatus READY dan siap untuk switch cepat.',
   };
 }
+
+/**
+ * Memfilter daftar akses akun berdasarkan filter status (mis. 'READY' atau 'ALL')
+ */
+export function filterAccessesByStatus(
+  accesses: Access[],
+  filter: 'ALL' | 'READY'
+): Access[] {
+  if (filter === 'READY') {
+    return accesses.filter((a) => a.status === 'ready');
+  }
+  return accesses;
+}
+

@@ -391,6 +391,26 @@ describe('TASK-012: Hardening PWA, Offline & Uji Akhir', () => {
       expect(deletedCaches).not.toContain('ai-account-manager-v2');
       expect(claimed.value).toBe(true);
     });
+
+    it('android_pwa_tutorial_and_assets - Tutorial PWA Android memuat URL HTTPS dan ikon PNG lengkap', () => {
+      const tutorialPath = path.resolve(process.cwd(), 'TUTORIAL_INSTALL_PWA_ANDROID.md');
+      expect(fs.existsSync(tutorialPath)).toBe(true);
+      const content = fs.readFileSync(tutorialPath, 'utf-8');
+      expect(content).toContain('https://');
+      expect(content).toContain('https://ais-pre-67vxjndwqva5pmnr234qt6-557789186714.asia-southeast1.run.app');
+      expect(content).toContain('Buka di Chrome');
+
+      // Cek berkas ikon PNG Android fisik
+      const png192 = path.resolve(process.cwd(), 'public/icon-192.png');
+      const png512 = path.resolve(process.cwd(), 'public/icon-512.png');
+      const maskable = path.resolve(process.cwd(), 'public/icon-maskable-512.png');
+      expect(fs.existsSync(png192)).toBe(true);
+      expect(fs.existsSync(png512)).toBe(true);
+      expect(fs.existsSync(maskable)).toBe(true);
+      expect(fs.statSync(png192).size).toBeGreaterThan(100);
+      expect(fs.statSync(png512).size).toBeGreaterThan(100);
+      expect(fs.statSync(maskable).size).toBeGreaterThan(100);
+    });
   });
 });
 
